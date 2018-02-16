@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"github.com/olivere/elastic/uritemplates"
 )
 
 // MgetService allows to get multiple documents based on an index,
@@ -25,6 +26,7 @@ type MgetService struct {
 	realtime     *bool
 	refresh      string
 	routing      string
+	index        []string
 	storedFields []string
 	items        []*MultiGetItem
 }
@@ -80,6 +82,12 @@ func (s *MgetService) Add(items ...*MultiGetItem) *MgetService {
 	return s
 }
 
+// Index sets the names of the indices to use for _mget.
+func (s *MgetService) Index(index ...string) *MgetService {
+	s.index = append(s.index, index...)
+	return s
+}
+
 // Source returns the request body, which will be serialized into JSON.
 func (s *MgetService) Source() (interface{}, error) {
 	source := make(map[string]interface{})
@@ -98,7 +106,16 @@ func (s *MgetService) Source() (interface{}, error) {
 // Do executes the request.
 func (s *MgetService) Do(ctx context.Context) (*MgetResponse, error) {
 	// Build url
-	path := "/_mget"
+	var err error
+	var path string
+
+	if len(s.index) > 0 {
+		path, err = uritemplates.Expand("/{index}/_mget", map[string]string{
+			"index": strings.Join(s.index, ","),
+		})
+	} else {
+		path = "/_mget"
+	}
 
 	params := make(url.Values)
 	if s.realtime != nil {
